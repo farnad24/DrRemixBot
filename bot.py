@@ -2,14 +2,14 @@ import os
 import logging
 import tempfile
 from telegram import Update, ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler, run_async
 
 from config import TOKEN, MUSIC_LIBRARY_PATH
 from database import init_db, get_song_by_id, get_fingerprints
 from audio_fingerprint import generate_fingerprint, compare_fingerprints, visualize_audio
 
 # تنظیم لاگ‌های برنامه
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # مقداردهی اولیه دیتابیس
@@ -61,7 +61,8 @@ def about_command(update: Update, context: CallbackContext) -> None:
         parse_mode=ParseMode.MARKDOWN
     )
 
-async def process_audio(update: Update, context: CallbackContext) -> None:
+@run_async
+def process_audio(update: Update, context: CallbackContext) -> None:
     """پردازش فایل صوتی دریافتی و جستجو برای آهنگ مشابه"""
     # چک کردن فرمت فایل دریافتی
     audio_file = None
@@ -88,23 +89,23 @@ async def process_audio(update: Update, context: CallbackContext) -> None:
         return
     
     # دریافت و ذخیره فایل ارسالی
-    status_message = await update.message.reply_text("در حال دریافت فایل صوتی... ⏳")
+    status_message = update.message.reply_text("در حال دریافت فایل صوتی... ⏳")
     
-    file = await context.bot.get_file(audio_file.file_id)
+    file = context.bot.get_file(audio_file.file_id)
     
     with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as temp_file:
         temp_path = temp_file.name
     
-    await file.download_to_drive(custom_path=temp_path)
+    file.download(custom_path=temp_path)
     
-    await status_message.edit_text("در حال پردازش فایل صوتی و استخراج ویژگی‌ها... 🔍")
+    status_message.edit_text("در حال پردازش فایل صوتی و استخراج ویژگی‌ها... 🔍")
     
     # استخراج اثر انگشت صوتی
     demo_fingerprint = generate_fingerprint(temp_path)
     
     if demo_fingerprint is None:
         os.unlink(temp_path)  # پاک کردن فایل موقت
-        await status_message.edit_text("خطا در پردازش فایل صوتی. لطفاً فایل دیگری ارسال کنید.")
+        status_message.edit_text("خطا در پردازش فایل صوتی. لطفاً فایل دیگری ارسال کنید.")
         return
     
     # دریافت همه اثر انگشت‌های دیتابیس
@@ -112,22 +113,22 @@ async def process_audio(update: Update, context: CallbackContext) -> None:
     
     if not db_fingerprints:
         os.unlink(temp_path)  # پاک کردن فایل موقت
-        await status_message.edit_text("هیچ آهنگی در دیتابیس وجود ندارد. لطفاً ابتدا کتابخانه موسیقی را پر کنید.")
+        status_message.edit_text("هیچ آهنگی در دیتابیس وجود ندارد. لطفاً ابتدا کتابخانه موسیقی را پر کنید.")
         return
     
     # مقایسه اثر انگشت صوتی با دیتابیس
-    await status_message.edit_text("در حال جستجو در کتابخانه موسیقی... 🔎")
+    status_message.edit_text("در حال جستجو در کتابخانه موسیقی... 🔎")
     results = compare_fingerprints(demo_fingerprint, db_fingerprints)
     
     # پاک کردن فایل موقت
     os.unlink(temp_path)
     
     if not results:
-        await status_message.edit_text("متأسفانه آهنگ مشابهی در کتابخانه پیدا نشد. 😔")
+        status_message.edit_text("متأسفانه آهنگ مشابهی در کتابخانه پیدا نشد. 😔")
         return
     
     # ارسال نتایج به کاربر
-    await status_message.edit_text("آهنگ(های) مشابه پیدا شد! در حال ارسال... 🎵")
+    status_message.edit_text("آهنگ(های) مشابه پیدا شد! در حال ارسال... 🎵")
     
     for i, result in enumerate(results[:3]):  # حداکثر 3 نتیجه اول
         song = get_song_by_id(result['id'])
@@ -140,7 +141,7 @@ async def process_audio(update: Update, context: CallbackContext) -> None:
         
         # ارسال فایل آهنگ
         with open(song.file_path, 'rb') as audio:
-            await context.bot.send_audio(
+            context.bot.send_audio(
                 chat_id=update.effective_chat.id,
                 audio=audio,
                 caption=info_message,
