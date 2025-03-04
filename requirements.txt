@@ -1,0 +1,9 @@
+python-telegram-bot==13.15
+numpy==1.24.3
+librosa==0.10.0
+soundfile==0.12.1
+scikit-learn==1.2.2
+matplotlib==3.7.1
+SQLAlchemy==2.0.19
+tqdm==4.66.1
+python-dotenv==1.0.0 

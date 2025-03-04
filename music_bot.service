@@ -1,0 +1,17 @@
+[Unit]
+Description=Telegram Music Finder Bot
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/music-finder-bot
+ExecStart=/bin/bash /path/to/music-finder-bot/run_bot.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=music-bot
+
+[Install]
+WantedBy=multi-user.target 
